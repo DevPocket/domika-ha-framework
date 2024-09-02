@@ -1,0 +1,271 @@
+# vim: set fileencoding=utf-8
+"""
+Push data.
+
+(c) DevPocket, 2024
+
+
+Author(s): Artem Bezborodko
+"""
+
+import json
+import uuid
+
+import aiohttp
+import sqlalchemy
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from .. import config, logger, push_server_errors, statuses
+from ..device import service as device_service
+from ..device.models import Device, DomikaDeviceUpdate
+from .models import DomikaPushDataCreate, PushData
+from .service import create, decrease_delay_all, delete_by_app_session_id
+
+
+async def register_event(
+    db_session: AsyncSession,
+    http_session: aiohttp.ClientSession,
+    *,
+    push_data: list[DomikaPushDataCreate],
+    critical_push_needed: bool,
+):
+    """
+    Register new push data, and send critical push if needed.
+
+    All push data items must belong to the same entity and share same context.
+
+    Args:
+        db_session: sqlalchemy session.
+        http_session: aiohhtp session.
+        push_data: list of push data entities.
+        critical_push_needed: critical push flag.
+
+    Raises:
+        errors.DatabaseError: in case when database operation can't be performed.
+        push_server_errors.DomikaPushServerError: in case of internal aiohttp error.
+        push_server_errors.BadRequestError: if push server response with bad request.
+        push_server_errors.UnexpectedServerResponseError: if push server response with unexpected
+        status.
+    """
+    if not push_data:
+        return
+
+    # TODO: do we really need to save push data in case of critical push?
+    await create(db_session, push_data)
+
+    if critical_push_needed:
+        verified_devices = await device_service.get_all_with_push_session_id(db_session)
+
+        # Create events dict for critical push.
+        # Format example:
+        # '{
+        # '  "binary_sensor.smoke": {
+        # '    "s": {
+        # '      "v": "on",
+        # '        "t": 717177272
+        # '     }
+        # '  }
+        # '}
+        events_dict = {}
+        entity = {}
+        events_dict[push_data[0].entity_id] = entity
+        for pd in push_data:
+            entity[pd.attribute] = {
+                "v": pd.value,
+                "t": pd.timestamp,
+            }
+
+        for device in verified_devices:
+            await _send_push_data(
+                db_session,
+                http_session,
+                device.app_session_id,
+                # get_all_with_push_session_id return devices with filled push_session_id.
+                device.push_session_id,  # type: ignore
+                events_dict,
+                critical=True,
+            )
+
+
+async def _send_push_data(
+    db_session: AsyncSession,
+    http_session: aiohttp.ClientSession,
+    app_session_id: uuid.UUID,
+    push_session_id: uuid.UUID,
+    events_dict: dict,
+    *,
+    critical: bool = False,
+):
+    logger.logger.debug(
+        "Push %sevents to %s. %s",
+        "critical " if critical else "",
+        push_session_id,
+        events_dict,
+    )
+
+    try:
+        async with (
+            http_session.post(
+                f"{config.CONFIG.push_server_url}/notification/critical_push"
+                if critical
+                else f"{config.CONFIG.push_server_url}/notification/push",
+                headers={
+                    # TODO: rename to x-push-session-id
+                    "x-session-id": str(push_session_id),
+                },
+                json={"data": json.dumps(events_dict)},
+                timeout=config.CONFIG.push_server_timeout,
+            ) as resp,
+        ):
+            if resp.status == statuses.HTTP_204_NO_CONTENT:
+                # All OK. Notification pushed.
+                return
+
+            if resp.status == statuses.HTTP_401_UNAUTHORIZED:
+                # Push session id not found on push server.
+                # Remove push session id for device.
+                device = await device_service.get(db_session, app_session_id)
+                if device:
+                    logger.logger.info(
+                        'The server rejected push session id "%s"',
+                        push_session_id,
+                    )
+                    await device_service.update(
+                        db_session,
+                        device,
+                        DomikaDeviceUpdate(push_session_id=None),
+                    )
+                    logger.logger.info(
+                        'Push session "%s" for app session "%s" successfully removed',
+                        push_session_id,
+                        app_session_id,
+                    )
+                return
+
+            if resp.status == statuses.HTTP_400_BAD_REQUEST:
+                raise push_server_errors.BadRequestError(await resp.json())
+
+            raise push_server_errors.UnexpectedServerResponseError(resp.status)
+    except aiohttp.ClientError as e:
+        raise push_server_errors.DomikaPushServerError(str(e)) from None
+
+
+async def push_registered_events(
+    db_session: AsyncSession,
+    http_session: aiohttp.ClientSession,
+):
+    """
+    Push registered events with delay = 0 to the push server.
+
+    Select registered events with delay = 0, create formatted push data, send it to the push server
+    api, delete all registered events for involved app sessions.
+
+    Args:
+        db_session: sqlalchemy session.
+        http_session: aiohhtp session.
+
+    Raises:
+        errors.DatabaseError: in case when database operation can't be performed.
+        push_server_errors.DomikaPushServerError: in case of internal aiohttp error.
+        push_server_errors.BadRequestError: if push server response with bad request.
+        push_server_errors.UnexpectedServerResponseError: if push server response with unexpected
+        status.
+    """
+    await decrease_delay_all(db_session)
+
+    # TODO: add check for elapsed time.
+    stmt = sqlalchemy.select(PushData, Device.push_session_id)
+    stmt = stmt.join(Device, PushData.app_session_id == Device.app_session_id)
+    stmt = stmt.where(Device.push_session_id.is_not(None))
+    stmt = stmt.order_by(
+        Device.push_session_id,
+        PushData.entity_id,
+    )
+    push_data_records = (await db_session.execute(stmt)).all()
+
+    # Create push data dict.
+    # Format example:
+    # '{
+    # '  "binary_sensor.smoke": {
+    # '    "s": {
+    # '       "v": "on",
+    # '       "t": 717177272
+    # '     }
+    # '  },
+    # '  "light.light": {
+    # '    "s": {
+    # '       "v": "off",
+    # '       "t": 717145367
+    # '     }
+    # '  },
+    # '}
+    app_sessions_ids_to_delete_list: list[uuid.UUID] = []
+    events_dict = {}
+    current_entity_id: str | None = None
+    current_push_session_id: uuid.UUID | None = None
+    current_app_session_id: uuid.UUID | None = None
+    found_delay_zero: bool = False
+
+    entity = {}
+    for push_data_record in push_data_records:
+        logger.logger.debug(
+            ">>> push_data_record=%s, %s",
+            push_data_record[0],
+            push_data_record[1],
+        )
+        if current_app_session_id != push_data_record[0].app_session_id:
+            logger.logger.debug(
+                ">>> is it time to send pushes? "
+                "found_delay_zero=%s, events_dict=%s, current_push_session_id=%s",
+                found_delay_zero,
+                events_dict,
+                current_push_session_id,
+            )
+            # TODO: add current_app_session_id to the check.
+            if found_delay_zero and events_dict and current_push_session_id:
+                await _send_push_data(
+                    db_session,
+                    http_session,
+                    current_app_session_id,
+                    current_push_session_id,
+                    events_dict,
+                )
+                app_sessions_ids_to_delete_list.append(current_app_session_id)
+            current_push_session_id = push_data_record[1]
+            current_app_session_id = push_data_record[0].app_session_id
+            current_entity_id = None
+            events_dict = {}
+            found_delay_zero = False
+        if current_entity_id != push_data_record[0].entity_id:
+            entity = {}
+            events_dict[push_data_record[0].entity_id] = entity
+            current_entity_id = push_data_record[0].entity_id
+        entity[push_data_record[0].attribute] = {
+            "v": push_data_record[0].value,
+            "t": push_data_record[0].timestamp,
+        }
+        found_delay_zero = found_delay_zero or (push_data_record[0].delay == 0)
+
+    logger.logger.debug(
+        ">>> is it time to send pushes? "
+        "found_delay_zero=%s, events_dict=%s, current_push_session_id=%s",
+        found_delay_zero,
+        events_dict,
+        current_push_session_id,
+    )
+    # TODO: add current_app_session_id to the check.
+    if found_delay_zero and events_dict and current_push_session_id:
+        await _send_push_data(
+            db_session,
+            http_session,
+            current_app_session_id,
+            current_push_session_id,
+            events_dict,
+        )
+        app_sessions_ids_to_delete_list.append(current_app_session_id)
+
+    logger.logger.debug(
+        ">>> delete_by_app_session_id: app_sessions_ids_to_delete_list=%s",
+        app_sessions_ids_to_delete_list,
+    )
+    await delete_by_app_session_id(db_session, app_sessions_ids_to_delete_list)
