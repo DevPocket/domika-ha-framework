@@ -102,7 +102,7 @@ async def push_registered_events(
 
     Args:
         db_session: sqlalchemy session.
-        http_session: aiohhtp session.
+        http_session: aiohttp session.
 
     Raises:
         errors.DatabaseError: in case when database operation can't be performed.
