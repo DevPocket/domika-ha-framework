@@ -98,6 +98,7 @@ async def update_app_session_id(
 
 async def remove_push_session(
     db_session: AsyncSession,
+    http_session: aiohttp.ClientSession,
     app_session_id: uuid.UUID,
 ) -> uuid.UUID:
     """
@@ -105,6 +106,7 @@ async def remove_push_session(
 
     Args:
         db_session: sqlalchemy session.
+        http_session: aiohttp session.
         app_session_id: application session id.
 
     Raises:
@@ -128,8 +130,7 @@ async def remove_push_session(
     try:
         await device_service.update(db_session, device, DomikaDeviceUpdate(push_session_id=None))
         async with (
-            aiohttp.ClientSession(json_serialize=json.dumps) as session,
-            session.delete(
+            http_session.delete(
                 f"{config.CONFIG.push_server_url}/push_session",
                 headers={
                     # TODO: rename to x-push-session-id
@@ -153,6 +154,7 @@ async def remove_push_session(
 
 
 async def create_push_session(
+    http_session: aiohttp.ClientSession,
     original_transaction_id: str,
     platform: str,
     environment: str,
@@ -163,6 +165,7 @@ async def create_push_session(
     Initialize push session creation flow on the push server.
 
     Args:
+        http_session: aiohttp session.
         original_transaction_id: original transaction id from the application.
         platform: application platform.
         environment: application environment.
@@ -182,8 +185,7 @@ async def create_push_session(
 
     try:
         async with (
-            aiohttp.ClientSession(json_serialize=json.dumps) as session,
-            session.post(
+            http_session.post(
                 f"{config.CONFIG.push_server_url}/push_session/create",
                 json={
                     "original_transaction_id": original_transaction_id,
@@ -210,6 +212,7 @@ async def create_push_session(
 
 async def verify_push_session(
     db_session: AsyncSession,
+    http_session: aiohttp.ClientSession,
     app_session_id: uuid.UUID,
     verification_key: str,
     push_token_hash: str,
@@ -221,6 +224,7 @@ async def verify_push_session(
 
     Args:
         db_session: sqlalchemy session.
+        http_session: aiohttp session.
         app_session_id: application session id.
         verification_key: verification key.
         push_token_hash: hash of the triplet (push_token, platform, environment)
@@ -244,8 +248,7 @@ async def verify_push_session(
 
     try:
         async with (
-            aiohttp.ClientSession(json_serialize=json.dumps) as session,
-            session.post(
+            http_session.post(
                 f"{config.CONFIG.push_server_url}/push_session/verify",
                 json={
                     "verification_key": verification_key,
