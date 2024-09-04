@@ -50,7 +50,10 @@ async def register_event(
     if not push_data:
         return
 
-    # TODO: do we really need to save push data in case of critical push?
+    logger.logger.debug(
+        "Create push data for %s",
+        push_data[0].entity_id,
+    )
     await create(db_session, push_data)
 
     if critical_push_needed:
@@ -85,69 +88,6 @@ async def register_event(
                 events_dict,
                 critical=True,
             )
-
-
-async def _send_push_data(
-    db_session: AsyncSession,
-    http_session: aiohttp.ClientSession,
-    app_session_id: uuid.UUID,
-    push_session_id: uuid.UUID,
-    events_dict: dict,
-    *,
-    critical: bool = False,
-):
-    logger.logger.debug(
-        "Push %sevents to %s. %s",
-        "critical " if critical else "",
-        push_session_id,
-        events_dict,
-    )
-
-    try:
-        async with (
-            http_session.post(
-                f"{config.CONFIG.push_server_url}/notification/critical_push"
-                if critical
-                else f"{config.CONFIG.push_server_url}/notification/push",
-                headers={
-                    # TODO: rename to x-push-session-id
-                    "x-session-id": str(push_session_id),
-                },
-                json={"data": json.dumps(events_dict)},
-                timeout=config.CONFIG.push_server_timeout,
-            ) as resp,
-        ):
-            if resp.status == statuses.HTTP_204_NO_CONTENT:
-                # All OK. Notification pushed.
-                return
-
-            if resp.status == statuses.HTTP_401_UNAUTHORIZED:
-                # Push session id not found on push server.
-                # Remove push session id for device.
-                device = await device_service.get(db_session, app_session_id)
-                if device:
-                    logger.logger.info(
-                        'The server rejected push session id "%s"',
-                        push_session_id,
-                    )
-                    await device_service.update(
-                        db_session,
-                        device,
-                        DomikaDeviceUpdate(push_session_id=None),
-                    )
-                    logger.logger.info(
-                        'Push session "%s" for app session "%s" successfully removed',
-                        push_session_id,
-                        app_session_id,
-                    )
-                return
-
-            if resp.status == statuses.HTTP_400_BAD_REQUEST:
-                raise push_server_errors.BadRequestError(await resp.json())
-
-            raise push_server_errors.UnexpectedServerResponseError(resp.status)
-    except aiohttp.ClientError as e:
-        raise push_server_errors.DomikaPushServerError(str(e)) from None
 
 
 async def push_registered_events(
@@ -269,3 +209,66 @@ async def push_registered_events(
         app_sessions_ids_to_delete_list,
     )
     await delete_by_app_session_id(db_session, app_sessions_ids_to_delete_list)
+
+
+async def _send_push_data(
+    db_session: AsyncSession,
+    http_session: aiohttp.ClientSession,
+    app_session_id: uuid.UUID,
+    push_session_id: uuid.UUID,
+    events_dict: dict,
+    *,
+    critical: bool = False,
+):
+    logger.logger.debug(
+        "Push %sevents to %s. %s",
+        "critical " if critical else "",
+        push_session_id,
+        events_dict,
+    )
+
+    try:
+        async with (
+            http_session.post(
+                f"{config.CONFIG.push_server_url}/notification/critical_push"
+                if critical
+                else f"{config.CONFIG.push_server_url}/notification/push",
+                headers={
+                    # TODO: rename to x-push-session-id
+                    "x-session-id": str(push_session_id),
+                },
+                json={"data": json.dumps(events_dict)},
+                timeout=config.CONFIG.push_server_timeout,
+            ) as resp,
+        ):
+            if resp.status == statuses.HTTP_204_NO_CONTENT:
+                # All OK. Notification pushed.
+                return
+
+            if resp.status == statuses.HTTP_401_UNAUTHORIZED:
+                # Push session id not found on push server.
+                # Remove push session id for device.
+                device = await device_service.get(db_session, app_session_id)
+                if device:
+                    logger.logger.info(
+                        'The server rejected push session id "%s"',
+                        push_session_id,
+                    )
+                    await device_service.update(
+                        db_session,
+                        device,
+                        DomikaDeviceUpdate(push_session_id=None),
+                    )
+                    logger.logger.info(
+                        'Push session "%s" for app session "%s" successfully removed',
+                        push_session_id,
+                        app_session_id,
+                    )
+                return
+
+            if resp.status == statuses.HTTP_400_BAD_REQUEST:
+                raise push_server_errors.BadRequestError(await resp.json())
+
+            raise push_server_errors.UnexpectedServerResponseError(resp.status)
+    except aiohttp.ClientError as e:
+        raise push_server_errors.DomikaPushServerError(str(e)) from None
