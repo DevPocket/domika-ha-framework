@@ -36,9 +36,6 @@ _CONFIG = {
         "": "src",
     },
     "packages": find_packages("src"),
-    # "package_data": {
-    #     "": ["alembic.ini", "migrations/*", "migrations/**/*"],
-    # },
     "include_package_data": True,
     "scripts": [],
     "entry_points": {},
