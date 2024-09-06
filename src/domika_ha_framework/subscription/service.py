@@ -25,21 +25,20 @@ async def get(
     db_session: AsyncSession,
     app_session_id: uuid.UUID,
     *,
-    need_push: bool = True,
+    need_push: Optional[bool] = True,
     entity_id: Optional[str] = None,
 ) -> Sequence[Subscription]:
     """
     Get all subscriptions by application session id.
 
-    Subscriptions filtered by need_push flag.
+    Subscriptions filtered by need_push flag. If need_push is None no filtering applied.
 
     Raise:
         errors.DatabaseError: in case when database operation can't be performed.
     """
-    stmt = sqlalchemy.select(Subscription).where(
-        Subscription.app_session_id == app_session_id,
-        Subscription.need_push == need_push,
-    )
+    stmt = sqlalchemy.select(Subscription).where(Subscription.app_session_id == app_session_id)
+    if need_push is not None:
+        stmt = stmt.where(Subscription.need_push == need_push)
     if entity_id:
         stmt = stmt.where(Subscription.entity_id == entity_id)
     stmt = stmt.order_by(Subscription.entity_id).order_by(Subscription.attribute)
