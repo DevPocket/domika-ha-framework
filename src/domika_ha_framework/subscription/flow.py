@@ -109,7 +109,7 @@ async def get_push_attributes(db_session: AsyncSession, app_session_id: uuid.UUI
 
     Args:
         db_session: sqlalchemy session.
-        app_session_id: application sesison id.
+        app_session_id: application sesssion id.
 
     Returns:
         list of entity_id grouped with their attributes.

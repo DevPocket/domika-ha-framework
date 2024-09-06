@@ -22,7 +22,7 @@ from .models import Device, DomikaDeviceCreate, DomikaDeviceUpdate
 
 async def get(db_session: AsyncSession, app_session_id: uuid.UUID) -> Device | None:
     """
-    Get device by application sesison id.
+    Get device by application session id.
 
     Raise:
         errors.DatabaseError: in case when database operation can't be performed.
@@ -36,7 +36,7 @@ async def get(db_session: AsyncSession, app_session_id: uuid.UUID) -> Device | N
 
 async def get_all_with_push_session_id(db_session: AsyncSession) -> Sequence[Device]:
     """
-    Get device by application sesison id.
+    Get device by application session id.
 
     Raise:
         errors.DatabaseError: in case when database operation can't be performed.
