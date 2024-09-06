@@ -50,10 +50,6 @@ async def register_event(
     if not push_data:
         return
 
-    logger.logger.debug(
-        "Create push data for %s",
-        push_data[0].entity_id,
-    )
     await create(db_session, push_data)
 
     if critical_push_needed:
@@ -113,7 +109,6 @@ async def push_registered_events(
     """
     await decrease_delay_all(db_session)
 
-    # TODO: add check for elapsed time.
     stmt = sqlalchemy.select(PushData, Device.push_session_id)
     stmt = stmt.join(Device, PushData.app_session_id == Device.app_session_id)
     stmt = stmt.where(Device.push_session_id.is_not(None))
@@ -148,21 +143,13 @@ async def push_registered_events(
 
     entity = {}
     for push_data_record in push_data_records:
-        logger.logger.debug(
-            ">>> push_data_record=%s, %s",
-            push_data_record[0],
-            push_data_record[1],
-        )
         if current_app_session_id != push_data_record[0].app_session_id:
-            logger.logger.debug(
-                ">>> is it time to send pushes? "
-                "found_delay_zero=%s, events_dict=%s, current_push_session_id=%s",
-                found_delay_zero,
-                events_dict,
-                current_push_session_id,
-            )
-            # TODO: add current_app_session_id to the check.
-            if found_delay_zero and events_dict and current_push_session_id:
+            if (
+                found_delay_zero
+                and events_dict
+                and current_push_session_id
+                and current_app_session_id
+            ):
                 await _send_push_data(
                     db_session,
                     http_session,
@@ -186,15 +173,7 @@ async def push_registered_events(
         }
         found_delay_zero = found_delay_zero or (push_data_record[0].delay == 0)
 
-    logger.logger.debug(
-        ">>> is it time to send pushes? "
-        "found_delay_zero=%s, events_dict=%s, current_push_session_id=%s",
-        found_delay_zero,
-        events_dict,
-        current_push_session_id,
-    )
-    # TODO: add current_app_session_id to the check.
-    if found_delay_zero and events_dict and current_push_session_id:
+    if found_delay_zero and events_dict and current_push_session_id and current_app_session_id:
         await _send_push_data(
             db_session,
             http_session,
@@ -204,10 +183,6 @@ async def push_registered_events(
         )
         app_sessions_ids_to_delete_list.append(current_app_session_id)
 
-    logger.logger.debug(
-        ">>> delete_by_app_session_id: app_sessions_ids_to_delete_list=%s",
-        app_sessions_ids_to_delete_list,
-    )
     await delete_by_app_session_id(db_session, app_sessions_ids_to_delete_list)
 
 
