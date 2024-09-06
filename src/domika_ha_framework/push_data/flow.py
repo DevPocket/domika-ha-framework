@@ -225,7 +225,7 @@ async def _send_push_data(
                 # Remove push session id for device.
                 device = await device_service.get(db_session, app_session_id)
                 if device:
-                    logger.logger.info(
+                    logger.logger.debug(
                         'The server rejected push session id "%s"',
                         push_session_id,
                     )
@@ -234,7 +234,7 @@ async def _send_push_data(
                         device,
                         DomikaDeviceUpdate(push_session_id=None),
                     )
-                    logger.logger.info(
+                    logger.logger.debug(
                         'Push session "%s" for app session "%s" successfully removed',
                         push_session_id,
                         app_session_id,

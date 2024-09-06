@@ -13,7 +13,6 @@ import sqlalchemy.dialects.sqlite as sqlite_dialect
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from .. import logger
 from ..errors import DatabaseError
 from .models import Dashboard, DomikaDashboardCreate, DomikaDashoardUpdate
 
@@ -63,8 +62,6 @@ async def create_or_update(
     except SQLAlchemyError as e:
         raise DatabaseError(str(e)) from e
 
-    logger.logger.debug('Created or updated dashboard for user "%s"', dashboard_in.user_id)
-
     return result
 
 
@@ -93,8 +90,6 @@ async def update(
     except SQLAlchemyError as e:
         raise DatabaseError(str(e)) from e
 
-    logger.logger.debug('Updated dashboard for user "%s"', dashboard.user_id)
-
 
 async def delete(
     db_session: AsyncSession,
@@ -117,5 +112,3 @@ async def delete(
             await db_session.commit()
     except SQLAlchemyError as e:
         raise DatabaseError(str(e)) from e
-
-    logger.logger.debug('Deleted dashboard for user "%s"', user_id)

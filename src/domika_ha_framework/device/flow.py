@@ -197,8 +197,6 @@ async def create_push_session(
                 timeout=config.CONFIG.push_server_timeout,
             ) as resp,
         ):
-            logger.logger.debug("create_push_session resp.status=%s", resp.status)
-
             if resp.status == statuses.HTTP_202_ACCEPTED:
                 return
 
