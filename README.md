@@ -1,3 +1,6 @@
+![PyPI - License](https://img.shields.io/pypi/l/domika-ha-framework)
+![PyPI - Version](https://img.shields.io/pypi/v/domika-ha-framework)
+
 # Domika haomeassistant framework
 
 Domika integration framework library.
