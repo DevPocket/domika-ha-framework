@@ -17,7 +17,7 @@ from alembic.config import Config as AlembicConfig
 from sqlalchemy import Connection
 from sqlalchemy.ext.asyncio import create_async_engine
 
-from .. import config
+from .. import config, logger
 
 ALEMBIC_INI_PATH = Path(Path(__file__).parent) / ".." / "alembic.ini"
 
@@ -45,3 +45,4 @@ async def migrate():
     # Clear DOMIKA_DB_URL environment variable. It should be used only with alembic direct call.
     os.environ["DOMIKA_DB_URL"] = ""
     await asyncio.get_event_loop().run_in_executor(None, lambda: asyncio.run(_migrate()))
+    logger.logger.debug("Database migration successful")
