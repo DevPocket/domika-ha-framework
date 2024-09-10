@@ -9,6 +9,7 @@ Author(s): Artem Bezborodko
 """
 
 import asyncio
+import os
 from pathlib import Path
 
 import alembic.command
@@ -41,4 +42,6 @@ async def migrate():
     All this strange stuff is made only for one reason - avoid HA warning about synchronous calls.
     Alembic developers do not plan to do true async migrations.
     """
+    # Clear DOMIKA_DB_URL environment variable. It should be used only with alembic direct call.
+    os.environ["DOMIKA_DB_URL"] = ""
     await asyncio.get_event_loop().run_in_executor(None, lambda: asyncio.run(_migrate()))

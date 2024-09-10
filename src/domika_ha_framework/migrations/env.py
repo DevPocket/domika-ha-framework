@@ -1,4 +1,16 @@
+# vim: set fileencoding=utf-8
+"""
+migrations.
+
+(c) DevPocket, 2024
+
+
+Author(s): Artem Bezborodko
+"""
+
 import asyncio
+import logging
+import os
 from logging.config import fileConfig
 
 from alembic import context
@@ -17,6 +29,9 @@ config = context.config
 # This line sets up loggers basically.
 if config.config_file_name is not None and config.attributes.get("configure_loggers", True):
     fileConfig(config.config_file_name, disable_existing_loggers=False)
+else:
+    alembic_logger = logging.getLogger("alembic")
+    alembic_logger.propagate = False
 
 # add your model's MetaData object here
 # for 'autogenerate' support
@@ -29,7 +44,14 @@ target_metadata = AsyncBase.metadata
 # ... etc.
 
 section = config.config_ini_section
-config.set_section_option(section, "DATABASE_URL", domika_ha_framework.config.CONFIG.database_url)
+
+# Get database url from library config.
+domika_db_url = domika_ha_framework.config.CONFIG.database_url
+if not domika_db_url:
+    # When using alembic direct read database url from env.
+    domika_db_url = os.getenv("DOMIKA_DB_URL") or ""
+
+config.set_section_option(section, "DATABASE_URL", domika_db_url)
 
 
 def run_migrations_offline() -> None:
