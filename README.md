@@ -1,4 +1,4 @@
-![PyPI - License](https://img.shields.io/pypi/l/domika-ha-framework)
+![GitHub License](https://img.shields.io/github/license/DevPocket/domika-ha-framework)
 ![PyPI - Version](https://img.shields.io/pypi/v/domika-ha-framework)
 
 # Domika haomeassistant framework
