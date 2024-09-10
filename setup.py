@@ -41,9 +41,9 @@ _CONFIG = {
     "entry_points": {},
     "install_requires": requrements,
     "classifiers": [
-        "Development Status :: 1 - Planning",
+        "Development Status :: 4 - Beta",
         "Intended Audience :: Developers",
-        "License :: OSI Approved",
+        "License :: OSI Approved :: MIT License",
         "Natural Language :: English",
         "Operating System :: POSIX :: Linux",
         "Programming Language :: Python",
