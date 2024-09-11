@@ -10,7 +10,7 @@ Author(s): Artem Bezborodko
 
 import uuid
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import Any, Optional
 
 from mashumaro import pass_through
 from mashumaro.config import BaseConfig
@@ -86,3 +86,15 @@ class DomikaPushDataUpdate(DataClassJSONMixin):
         """Mashumaro config."""
 
         omit_default = True
+
+
+@dataclass
+class DomikaPushedEvents(DataClassJSONMixin):
+    """Pushed events config."""
+
+    push_session_id: uuid.UUID = field(
+        metadata={
+            "serialization_strategy": pass_through,
+        },
+    )
+    events: dict[str, dict[str, Any]]

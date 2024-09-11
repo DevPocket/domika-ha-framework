@@ -18,7 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from .. import config, logger, push_server_errors, statuses
 from ..device import service as device_service
 from ..device.models import Device, DomikaDeviceUpdate
-from .models import DomikaPushDataCreate, PushData
+from .models import DomikaPushDataCreate, DomikaPushedEvents, PushData
 from .service import create, decrease_delay_all, delete_by_app_session_id
 
 
@@ -28,7 +28,7 @@ async def register_event(
     *,
     push_data: list[DomikaPushDataCreate],
     critical_push_needed: bool,
-):
+) -> list[DomikaPushedEvents]:
     """
     Register new push data, and send critical push if needed.
 
@@ -47,8 +47,9 @@ async def register_event(
         push_server_errors.UnexpectedServerResponseError: if push server response with unexpected
         status.
     """
+    result: list[DomikaPushedEvents] = []
     if not push_data:
-        return
+        return result
 
     await create(db_session, push_data)
 
@@ -78,6 +79,7 @@ async def register_event(
             if not device.push_session_id:
                 continue
 
+            result.append(DomikaPushedEvents(device.push_session_id, events_dict))
             await _send_push_data(
                 db_session,
                 http_session,
@@ -87,11 +89,13 @@ async def register_event(
                 critical=True,
             )
 
+    return result
+
 
 async def push_registered_events(
     db_session: AsyncSession,
     http_session: aiohttp.ClientSession,
-):
+) -> list[DomikaPushedEvents]:
     """
     Push registered events with delay = 0 to the push server.
 
@@ -109,6 +113,7 @@ async def push_registered_events(
         push_server_errors.UnexpectedServerResponseError: if push server response with unexpected
         status.
     """
+    result: list[DomikaPushedEvents] = []
     await decrease_delay_all(db_session)
 
     stmt = sqlalchemy.select(PushData, Device.push_session_id)
@@ -152,6 +157,7 @@ async def push_registered_events(
                 and current_push_session_id
                 and current_app_session_id
             ):
+                result.append(DomikaPushedEvents(current_push_session_id, events_dict))
                 await _send_push_data(
                     db_session,
                     http_session,
@@ -176,6 +182,7 @@ async def push_registered_events(
         found_delay_zero = found_delay_zero or (push_data_record[0].delay == 0)
 
     if found_delay_zero and events_dict and current_push_session_id and current_app_session_id:
+        result.append(DomikaPushedEvents(current_push_session_id, events_dict))
         await _send_push_data(
             db_session,
             http_session,
@@ -186,6 +193,8 @@ async def push_registered_events(
         app_sessions_ids_to_delete_list.append(current_app_session_id)
 
     await delete_by_app_session_id(db_session, app_sessions_ids_to_delete_list)
+
+    return result
 
 
 async def _send_push_data(
@@ -211,7 +220,6 @@ async def _send_push_data(
                 if critical
                 else f"{config.CONFIG.push_server_url}/notification/push",
                 headers={
-                    # TODO: rename to x-push-session-id
                     "x-session-id": str(push_session_id),
                 },
                 json={"data": json.dumps(events_dict)},
