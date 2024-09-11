@@ -75,12 +75,14 @@ async def register_event(
             }
 
         for device in verified_devices:
+            if not device.push_session_id:
+                continue
+
             await _send_push_data(
                 db_session,
                 http_session,
                 device.app_session_id,
-                # get_all_with_push_session_id return devices with filled push_session_id.
-                device.push_session_id,  # type: ignore
+                device.push_session_id,
                 events_dict,
                 critical=True,
             )
