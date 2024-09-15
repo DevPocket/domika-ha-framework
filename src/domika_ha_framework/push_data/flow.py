@@ -28,6 +28,7 @@ async def register_event(
     *,
     push_data: list[DomikaPushDataCreate],
     critical_push_needed: bool,
+    critical_alert_payload: dict,
 ) -> list[DomikaPushedEvents]:
     """
     Register new push data, and send critical push if needed.
@@ -39,6 +40,7 @@ async def register_event(
         http_session: aiohhtp session.
         push_data: list of push data entities.
         critical_push_needed: critical push flag.
+        critical_alert_payload: payload in case we need to send a critical push.
 
     Raises:
         errors.DatabaseError: in case when database operation can't be performed.
@@ -56,36 +58,16 @@ async def register_event(
     if critical_push_needed:
         verified_devices = await device_service.get_all_with_push_session_id(db_session)
 
-        # Create events dict for critical push.
-        # Format example:
-        # '{
-        # '  "binary_sensor.smoke": {
-        # '    "s": {
-        # '      "v": "on",
-        # '        "t": 717177272
-        # '     }
-        # '  }
-        # '}
-        events_dict = {}
-        entity = {}
-        events_dict[push_data[0].entity_id] = entity
-        for pd in push_data:
-            entity[pd.attribute] = {
-                "v": pd.value,
-                "t": pd.timestamp,
-            }
-
         for device in verified_devices:
             if not device.push_session_id:
                 continue
 
-            result.append(DomikaPushedEvents(device.push_session_id, events_dict))
             await _send_push_data(
                 db_session,
                 http_session,
                 device.app_session_id,
                 device.push_session_id,
-                events_dict,
+                critical_alert_payload,
                 critical=True,
             )
 
@@ -207,8 +189,8 @@ async def _send_push_data(
     critical: bool = False,
 ):
     logger.logger.debug(
-        "Push %sevents to %s. %s",
-        "critical " if critical else "",
+        "Push events %sto %s. %s",
+        "(critical) " if critical else "",
         push_session_id,
         events_dict,
     )
