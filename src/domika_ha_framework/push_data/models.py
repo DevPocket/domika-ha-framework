@@ -90,7 +90,7 @@ class DomikaPushDataUpdate(DataClassJSONMixin):
 
 @dataclass
 class DomikaPushedEvents(DataClassJSONMixin):
-    """Pushed events config."""
+    """Pushed events' config."""
 
     push_session_id: uuid.UUID = field(
         metadata={

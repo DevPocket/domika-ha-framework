@@ -20,7 +20,7 @@ async def init(cfg: config.Config):
     Perform migration if needed.
 
     Raise:
-        DatabaseError if can't be initialized.
+        DatabaseError, if can't be initialized.
     """
     config.CONFIG = cfg
     await database_core.init_db()
@@ -28,5 +28,5 @@ async def init(cfg: config.Config):
 
 
 async def dispose():
-    """Clean opened resources and close database conections."""
+    """Clean opened resources and close database connections."""
     await database_core.close_db()

@@ -19,3 +19,4 @@ dist
 # File-based project format
 *.iws
 .idea/**
+/build/

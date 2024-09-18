@@ -37,7 +37,7 @@ async def register_event(
 
     Args:
         db_session: sqlalchemy session.
-        http_session: aiohhtp session.
+        http_session: aiohttp session.
         push_data: list of push data entities.
         critical_push_needed: critical push flag.
         critical_alert_payload: payload in case we need to send a critical push.
@@ -81,8 +81,9 @@ async def push_registered_events(
     """
     Push registered events with delay = 0 to the push server.
 
-    Select registered events with delay = 0, create formatted push data, send it to the push server
-    api, delete all registered events for involved app sessions.
+    Select registered events with delay = 0, add events with delay > 0 for the same app_session_ids,
+    create formatted push data, send it to the push server api,
+    delete all registered events for involved app sessions.
 
     Args:
         db_session: sqlalchemy session.
@@ -95,6 +96,8 @@ async def push_registered_events(
         push_server_errors.UnexpectedServerResponseError: if push server response with unexpected
         status.
     """
+    logger.logger.debug("Push_registered_events started.")
+
     result: list[DomikaPushedEvents] = []
     await decrease_delay_all(db_session)
 
