@@ -16,12 +16,12 @@ with Path("README.md").open("r", encoding="utf-8") as f:
     long_description = f.read()
 
 with Path("requirements.txt").open("r", encoding="utf-8") as f:
-    requrements = f.readlines()
+    requirements = f.readlines()
 
 _CONFIG = {
     "name": "domika_ha_framework",
-    "version": "0.0.3",
-    "author": "DevPocket",
+    "version": "0.0.4",
+    "author": "DevPocket LLC",
     "author_email": "",
     "description": "Domika integration module framework.",
     "long_description": long_description,
@@ -39,7 +39,7 @@ _CONFIG = {
     "include_package_data": True,
     "scripts": [],
     "entry_points": {},
-    "install_requires": requrements,
+    "install_requires": requirements,
     "classifiers": [
         "Development Status :: 4 - Beta",
         "Intended Audience :: Developers",
