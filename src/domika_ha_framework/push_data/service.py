@@ -40,6 +40,24 @@ async def get(
         raise DatabaseError(str(e)) from e
 
 
+async def get_all(
+    db_session: AsyncSession,
+    limit: int = 100,
+    offset: int = 0,
+) -> Sequence[PushData]:
+    """
+    Get all push data.
+
+    Raise:
+        errors.DatabaseError: in case when database operation can't be performed.
+    """
+    stmt = sqlalchemy.select(PushData).limit(limit).offset(offset)
+    try:
+        return (await db_session.scalars(stmt)).all()
+    except SQLAlchemyError as e:
+        raise DatabaseError(str(e)) from e
+
+
 async def create(
     db_session: AsyncSession,
     events_in: list[DomikaPushDataCreate],
