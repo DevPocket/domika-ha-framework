@@ -93,9 +93,14 @@ docstring-quotes = "double"
 [lint.flake8-annotations]
 suppress-none-returning = true
 
+[lint.flake8-pytest-style]
+fixture-parentheses = false
+mark-parentheses = false
+
 [lint.flake8-builtins]
 builtins-ignorelist = ["id"]
 
 [lint.extend-per-file-ignores]
 "__init__.py" = ["F401"]
 "test*.py" = ["S101"]
+"tests/**" = ["D103", "PTH", "PLR2004"]

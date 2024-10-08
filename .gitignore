@@ -2,12 +2,14 @@
 .venv
 .vscode
 .pytest_cache
-dist
+.mypy_cache
+/dist
+/build
+.env
 
 **/__pycache__
 **/package.json
 **/*.egg-info
-.env
 
 # AppCode template
 .idea/**/workspace.xml
@@ -19,4 +21,3 @@ dist
 # File-based project format
 *.iws
 .idea/**
-/build/
