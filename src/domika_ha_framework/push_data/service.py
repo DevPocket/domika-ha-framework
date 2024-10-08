@@ -51,7 +51,14 @@ async def get_all(
     Raise:
         errors.DatabaseError: in case when database operation can't be performed.
     """
-    stmt = sqlalchemy.select(PushData).limit(limit).offset(offset)
+    stmt = sqlalchemy.select(PushData)
+    stmt = stmt.order_by(
+        PushData.event_id,
+        PushData.app_session_id,
+        PushData.entity_id,
+        PushData.attribute,
+    )
+    stmt = stmt.limit(limit).offset(offset)
     try:
         return (await db_session.scalars(stmt)).all()
     except SQLAlchemyError as e:
@@ -128,6 +135,7 @@ async def create(
             "value": stmt.excluded.value,
             "timestamp": stmt.excluded.timestamp,
         },
+        where=PushData.timestamp < stmt.excluded.timestamp,
     )
 
     try:
