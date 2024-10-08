@@ -20,7 +20,7 @@ with Path("requirements.txt").open("r", encoding="utf-8") as f:
 
 _CONFIG = {
     "name": "domika_ha_framework",
-    "version": "0.0.4",
+    "version": "0.0.5",
     "author": "DevPocket LLC",
     "author_email": "",
     "description": "Domika integration module framework.",
