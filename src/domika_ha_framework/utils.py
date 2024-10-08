@@ -13,7 +13,7 @@ import enum
 import itertools
 from collections.abc import Iterable, Mapping
 from pathlib import Path
-from typing import Any, Iterator, TypeVar
+from typing import Any, Generator, Iterator, TypeVar
 
 T = TypeVar("T")
 
@@ -96,13 +96,16 @@ def flatten_json(json: Mapping, exclude: set[str] | None = None) -> dict:
     return flattened_json
 
 
-def chunks(iterable: Iterable[T], size: int) -> Iterator["itertools.chain[T]"]:
+def chunks(iterable: Iterable[T], size: int) -> Generator[Iterator[T], None, None]:
     """
     Iterate over iterable in chunks.
 
     Args:
-        iterable: an iterable to iterate over
-        size: single chunk size
+        iterable: an iterable to iterate over.
+        size: single chunk size.
+
+    Yields:
+        iterator to a new chunk.
     """
     iterator = iter(iterable)
     for first in iterator:
